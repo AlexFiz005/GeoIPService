@@ -1,4 +1,6 @@
-﻿namespace GeoIPService.Models
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace GeoIPService.Models
 {
     /// <summary>
     /// Модель для представления геолокационной информации IP-адреса.
@@ -8,6 +10,8 @@
     /// </summary>
     public class GeoIPInfo
     {
+        [Key]
+        public int Id { get; set; }
         public string Ip { get; set; }
         public string City { get; set; }
         public string Region { get; set; }
