@@ -1,4 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.Net;
+using System.Text.Json.Serialization;
 
 namespace GeoIPService.Models
 {
@@ -11,6 +13,7 @@ namespace GeoIPService.Models
     public class GeoIPInfo
     {
         [Key]
+        [JsonIgnore]
         public int Id { get; set; }
         public string Ip { get; set; }
         public string City { get; set; }

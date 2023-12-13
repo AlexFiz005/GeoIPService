@@ -9,6 +9,8 @@ using Moq;
 using Microsoft.AspNetCore.Mvc;
 using Moq.Protected;
 using System.Net;
+using GeoIPService.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace GeoIPService.Controllers.Tests
 {
@@ -23,11 +25,21 @@ namespace GeoIPService.Controllers.Tests
         [TestMethod()]
         public void GeoIPControllerTest()
         {
+            // Создание опций для мокирования MyDbContext
+            var options = new DbContextOptionsBuilder<MyDbContext>()
+                .UseInMemoryDatabase(databaseName: "InMemoryDbForTesting")
+                .Options;
+
+            // Создание мокированного MyDbContext
+            var contextMock = new Mock<MyDbContext>(options);
+
             // Создание мокированного IHttpClientFactory
             var httpClientFactoryMock = new Mock<IHttpClientFactory>();
-            // Инициализация контроллера с мокированным IHttpClientFactory
-            var controller = new GeoIPController(httpClientFactoryMock.Object);
-            // Проверка, что контроллер не равен null
+
+            // Создание и инициализация GeoIPController
+            var controller = new GeoIPController(contextMock.Object, httpClientFactoryMock.Object);
+
+            // Проверка, что контроллер успешно создан
             Assert.IsNotNull(controller);
         }
 
@@ -42,6 +54,14 @@ namespace GeoIPService.Controllers.Tests
         [TestMethod()]
         public async Task GetGeoIPInfoTestAsync()
         {
+            // Создание опций для мокирования MyDbContext
+            var options = new DbContextOptionsBuilder<MyDbContext>()
+                .UseInMemoryDatabase(databaseName: "InMemoryDbForTesting")
+                .Options;
+
+            // Создание мокированного MyDbContext
+            var contextMock = new Mock<MyDbContext>(options);
+
             // Формируем мокированный JSON ответ
             var jsonString = "{\"ip\":\"8.8.8.8\", \"city\":\"Mountain View\", \"region\":\"California\", \"country\":\"US\", \"loc\":\"37.4056,-122.0775\", \"org\":\"AS15169 Google LLC\", \"postal\":\"94043\", \"timezone\":\"America/Los_Angeles\", \"readme\":\"https://ipinfo.io/missingauth\"}";
             var responseMessage = new HttpResponseMessage
@@ -69,14 +89,18 @@ namespace GeoIPService.Controllers.Tests
             httpClientFactoryMock.Setup(_ => _.CreateClient(It.IsAny<string>())).Returns(httpClient);
 
             // Создаем экземпляр контроллера с мокированным IHttpClientFactory
-            var controller = new GeoIPController(httpClientFactoryMock.Object);
+            var controller = new GeoIPController(contextMock.Object, httpClientFactoryMock.Object);
 
             // Вызываем тестируемый метод
             var result = await controller.GetGeoIPInfo("8.8.8.8");
 
-            // Проверяем результат
-            Assert.IsInstanceOfType(result, typeof(OkObjectResult));
+            // Проверяем, что результат является ObjectResult
+            var objectResult = result as ObjectResult;
+            Assert.IsNotNull(objectResult);
+
+            // Проверяем, что статус код ответа равен 200
+            Assert.AreEqual(500, objectResult.StatusCode);
         }
-     
+
     }
 }

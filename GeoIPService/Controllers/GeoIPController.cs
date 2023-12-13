@@ -5,6 +5,7 @@ using System.Net.Http;
 using Newtonsoft.Json;
 using Microsoft.EntityFrameworkCore;
 using GeoIPService.Data;
+using System.Net;
 
 namespace GeoIPService.Controllers
 {
@@ -21,7 +22,6 @@ namespace GeoIPService.Controllers
         /// <summary>
         /// Инициализирует новый экземпляр GeoIPController с необходимой фабрикой HttpClient.
         /// </summary>
-        /// <param name="httpClientFactory">Фабрика для создания экземпляров HttpClient.</param>
         public GeoIPController(MyDbContext context, IHttpClientFactory httpClientFactory)
         {
             _httpClientFactory = httpClientFactory;
@@ -36,19 +36,45 @@ namespace GeoIPService.Controllers
         [HttpGet("{ip}")]
         public async Task<IActionResult> GetGeoIPInfo(string ip)
         {
-            var httpClient = _httpClientFactory.CreateClient();
-            var response = await httpClient.GetAsync($"https://ipinfo.io/{ip}/geo");
-            if (response.IsSuccessStatusCode)
+            //Проверка Валидности.
+            if (!IPAddress.TryParse(ip, out _))
             {
-                var content = await response.Content.ReadAsStringAsync();
-                var geoIPInfo = JsonConvert.DeserializeObject<GeoIPInfo>(content);
-
-                //Сохраняем полученные данные в базу.
-                _context.GeoIPInfos.Add(geoIPInfo);
-                await _context.SaveChangesAsync();
-
-                return Ok(geoIPInfo);
+                return BadRequest("Invalid IP address.");
             }
+
+            try
+            {
+                var httpClient = _httpClientFactory.CreateClient();
+                var response = await httpClient.GetAsync($"https://ipinfo.io/{ip}/geo");
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var content = await response.Content.ReadAsStringAsync();
+                    var geoIPInfo = JsonConvert.DeserializeObject<GeoIPInfo>(content);
+
+                    if (geoIPInfo == null)
+                    {
+                        return StatusCode(500, "Error parsing response data.");
+                    }
+
+                    //Сохраняем полученные данные в базу.
+                    _context.GeoIPInfos.Add(geoIPInfo);
+                    await _context.SaveChangesAsync();
+
+                    return Ok(geoIPInfo);
+                }
+            }
+            catch (HttpRequestException ex)
+            {
+                // Логирование ошибки
+                return StatusCode(500, "Error accessing external service.");
+            }
+            catch (Exception ex)
+            {
+                // Логирование ошибки
+                return StatusCode(500, "An unexpected error occurred.");
+            }
+
             return NotFound();
         }
   
@@ -58,10 +84,8 @@ namespace GeoIPService.Controllers
         [HttpGet("all")]
         public async Task<IActionResult> GetAllGeoIPInfo()
         {
-            var allGeoIPInfos = await _context.GeoIPInfos.ToListAsync();
-            return Ok(allGeoIPInfos);
+            var allGeoIPInfo = await _context.GeoIPInfos.ToListAsync();
+            return Ok(allGeoIPInfo);
         }
-
-
     }
 }
